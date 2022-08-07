@@ -654,3 +654,16 @@ procdump(void)
     printf("\n");
   }
 }
+
+// 返回此时状态不等于UNUSED的进程数量 枚举 + 判断即可
+uint64
+count_process() 
+{
+  uint64 ret = 0;
+  for (int i = 0; i < NPROC; i++) {
+    if (proc[i].state != UNUSED) {
+      ret = ret + 1;
+    }
+  }
+  return ret;
+}
