@@ -119,7 +119,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-
+  p->trace_mask = 0; //掩码初始化成0
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -304,7 +304,7 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-
+  np->trace_mask = p->trace_mask; // 子进程的掩码
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -653,4 +653,17 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// 返回此时状态不等于UNUSED的进程数量 枚举 + 判断即可
+uint64
+count_process() 
+{
+  uint64 ret = 0;
+  for (int i = 0; i < NPROC; i++) {
+    if (proc[i].state != UNUSED) {
+      ret = ret + 1;
+    }
+  }
+  return ret;
 }

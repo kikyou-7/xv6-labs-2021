@@ -80,3 +80,16 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+// 计算此时内存空闲size 遍历空闲list 记录个数
+//xv6的空闲内存是用链表存的 节点就是一个空闲的page
+uint64 count_free_mem()
+{
+  acquire(&kmem.lock); // 必须先锁内存管理结构，防止竞态条件出现
+  uint64 freepage_cnt = 0;
+  for (struct run *r = kmem.freelist; r; r = r->next) {
+    freepage_cnt++;
+  }
+  release(&kmem.lock);
+  return freepage_cnt * PGSIZE;
+}

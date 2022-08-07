@@ -198,7 +198,9 @@ UPROGS=\
 	$U/_primes\
 	$U/_find\
 	$U/_xargs\
-	
+	$U/_trace\
+	$U/_sysinfotest\
+
 ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
 UPROGS += \
 	$U/_stats
@@ -220,6 +222,28 @@ UPROGS += \
 	$U/_cowtest
 endif
 
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+UPROGS += \
+	$U/_stats
+endif
+
+ifeq ($(LAB),traps)
+UPROGS += \
+	$U/_call\
+	$U/_bttest
+endif
+
+ifeq ($(LAB),lazy)
+UPROGS += \
+	$U/_lazytests
+endif
+
+ifeq ($(LAB),cow)
+UPROGS += \
+	$U/_cowtest
+endif
+
+>>>>>>> syscall
 ifeq ($(LAB),thread)
 UPROGS += \
 	$U/_uthread
