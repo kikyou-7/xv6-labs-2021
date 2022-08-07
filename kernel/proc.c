@@ -119,7 +119,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-
+  p->trace_mask = 0; //掩码初始化成0
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -304,7 +304,7 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-
+  np->trace_mask = p->trace_mask; // 子进程的掩码
   release(&np->lock);
 
   acquire(&wait_lock);
