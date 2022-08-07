@@ -243,7 +243,7 @@ UPROGS += \
 	$U/_cowtest
 endif
 
->>>>>>> syscall
+
 ifeq ($(LAB),thread)
 UPROGS += \
 	$U/_uthread
