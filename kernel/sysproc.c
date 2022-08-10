@@ -111,11 +111,12 @@ sys_trace(void)
 uint64 
 sys_sysinfo(void) 
 {
-  // 从用户态读入一个指针
+  // 从用户态读入一个指针 info结构体指针 用来保存所需的信息
   uint64 addr;
   if (argaddr(0, &addr) < 0) {
     return -1;
   }
+  // 信息先存在内核中, 然后通过copyout拷贝给用户层的结构体
   struct sysinfo sinfo;
   sinfo.freemem = count_free_mem(); // kalloc.c
   sinfo.nproc = count_process(); // proc.c

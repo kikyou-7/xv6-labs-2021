@@ -25,7 +25,7 @@ int uptime(void);
 int trace(int);
 
 struct sysinfo;
-int sysinfo(struct sysinfo *);
+int sysinfo(struct sysinfo *); // 用户层传进去一个结构体指针, 通过系统调用将信息保存在指针所指的对象中
 
 // ulib.c
 int stat(const char*, struct stat*);
