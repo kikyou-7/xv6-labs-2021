@@ -80,7 +80,35 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  // 需要检查的起始虚拟地址 结果存在buffer_ad中
+  // 遍历n个page n<=64, 检查每个page对应的PTE的PTE_A
+  uint64 start_ad, buffer_ad, a;
+  int n;
+  if(argaddr(0, &start_ad) < 0)
+    return -1;
+  if (argint(1, &n) < 0) 
+    return -1;
+  if (argaddr(2, &buffer_ad) < 0)
+    return -1;
+  uint64 temp_buf = 0;
+  if (n > 64) 
+    panic("sys_pgaccess: 64 pages limited");
+  pte_t *pte;
+  for(a = start_ad; a < start_ad + n*PGSIZE; a += PGSIZE){
+    if((pte = walk(myproc()->pagetable, a, 0)) == 0)
+      panic("sys_pgaccess: walk");
+    if((*pte & PTE_V) == 0)
+      panic("sys_pgaccess: not mapped");
+    if(PTE_FLAGS(*pte) == PTE_V)
+      panic("sys_pgaccess: not a leaf");
+    if (*pte & PTE_A) {
+      temp_buf |= 1 << ((a - start_ad) / PGSIZE);
+      // 处理完后把这页设为未被访问状态
+      *pte ^= PTE_A;
+    }
+  }
+  if(copyout(myproc()->pagetable, buffer_ad, (char *) &temp_buf, sizeof temp_buf)) 
+    return -1;
   return 0;
 }
 #endif
@@ -107,3 +135,4 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
