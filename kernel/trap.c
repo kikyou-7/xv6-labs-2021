@@ -43,11 +43,14 @@ usertrap(void)
 
   // send interrupts and exceptions to kerneltrap(),
   // since we're now in the kernel.
+  // stvec存的是用户态的陷阱处理地址, 要改为改为内核态的陷阱处理地址
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
   
   // save user program counter.
+  // 虽然进程的pc此时仍然在sepc寄存器中, 但可能发生: 程序还在内核中执行时, 我们切换到了另一个进程
+  // 并进入了另一个进程的地址空间, 那么sepc就会被覆盖掉, 所以我们手动保存在p->trapframe
   p->trapframe->epc = r_sepc();
   
   if(r_scause() == 8){
@@ -58,12 +61,14 @@ usertrap(void)
 
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
+    // 进程在系统调用返回后, 执行ecall的下一条指令(汇编指令是4个字节), 可以看成是时停结束
     p->trapframe->epc += 4;
 
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
+    //打开中断, 
     intr_on();
-
+    // 执行系统调用
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
@@ -87,6 +92,7 @@ usertrap(void)
 // return to user space
 //
 void
+
 usertrapret(void)
 {
   struct proc *p = myproc();
@@ -97,6 +103,7 @@ usertrapret(void)
   intr_off();
 
   // send syscalls, interrupts, and exceptions to trampoline.S
+  // stvec的值保存为trampoline
   w_stvec(TRAMPOLINE + (uservec - trampoline));
 
   // set up trapframe values that uservec will need when
@@ -110,12 +117,14 @@ usertrapret(void)
   // to get to user space.
   
   // set S Previous Privilege mode to User.
+  // 在trap时 硬件改了sstaus, 这里将它复原 
   unsigned long x = r_sstatus();
   x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
   x |= SSTATUS_SPIE; // enable interrupts in user mode
   w_sstatus(x);
 
   // set S Exception Program Counter to the saved user pc.
+  // 将进程恢复后要执行的地址保存在sepc
   w_sepc(p->trapframe->epc);
 
   // tell trampoline.S the user page table to switch to.
@@ -124,7 +133,11 @@ usertrapret(void)
   // jump to trampoline.S at the top of memory, which 
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.
+  // fn是trampoline的最后一段函数 userret: 
+  // 因为在C函数做的更新都是对p->trapframe, 没有真正更新寄存器, 这些要在userret中更新
+  // 寄存器要在汇编中更新, 所以satp也传过去, 让返回进程前satp寄存器存的是进程页表
   uint64 fn = TRAMPOLINE + (userret - trampoline);
+  // 第一个参数是TRAPFRAME的地址, 传给了寄存器a0; 
   ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
 }
 

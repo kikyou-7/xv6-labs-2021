@@ -34,7 +34,7 @@ exec(char *path, char **argv)
     goto bad;
   if(elf.magic != ELF_MAGIC)
     goto bad;
-
+  // 创建一个空的page table
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
 
@@ -116,6 +116,7 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
   if(p->pid==1) vmprint(p->pagetable); // lab03 task2
+  
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:

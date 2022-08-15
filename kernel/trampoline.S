@@ -29,6 +29,7 @@ uservec:
         csrrw a0, sscratch, a0
 
         # save the user registers in TRAPFRAME
+        # 除了a0之外都存
         sd ra, 40(a0)
         sd sp, 48(a0)
         sd gp, 56(a0)
@@ -98,6 +99,7 @@ userret:
 
         # put the saved user a0 in sscratch, so we
         # can swap it with our a0 (TRAPFRAME) in the last step.
+        # t0存的是syscall的返回值(trapframe->a0), 先保存在sscartch中 最后与寄存器a0交换
         ld t0, 112(a0)
         csrw sscratch, t0
 
@@ -134,6 +136,7 @@ userret:
         ld t6, 280(a0)
 
 	# restore user a0, and save TRAPFRAME in sscratch
+        # a0是TRAPFRAME, sscratch是系统调用返回值
         csrrw a0, sscratch, a0
         
         # return to user mode and user pc.

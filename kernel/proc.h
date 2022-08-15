@@ -78,7 +78,7 @@ struct trapframe {
   /* 264 */ uint64 t4;
   /* 272 */ uint64 t5;
   /* 280 */ uint64 t6;
-};
+}; // 进程通过系统调用 内核接管控制权 会保存此刻寄存器的数据到trapframe中 以便于系统调用结束后进程继续执行
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 

@@ -148,9 +148,10 @@ syscall(void)
 {
   int num;
   struct proc *p = myproc();
-
+  // 系统调用的编号存在于a7
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    // 返回值放再trapframe->a0, 这样回到用户进程后, 会将trapframe中的内容更新用户寄存器, 寄存器a0就得到了返回值
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n",
