@@ -122,6 +122,7 @@ panic(char *s)
   printf(s);
   printf("\n");
   panicked = 1; // freeze uart output from other CPUs
+  backtrace();
   for(;;)
     ;
 }
@@ -131,4 +132,21 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+// 
+// 先获取当前执行函数的frame pointer (指向caller函数的栈底(最高处)) 
+// 通过链表结构递归 打印return address
+void backtrace(void) 
+{
+  // 指向caller function的栈底 
+  uint64 fp = r_fp();
+  // 函数栈的栈底
+  uint64 base = PGROUNDUP(fp);
+  while (fp != base) {
+    // caller的栈底 - 8 就是return address的地址  
+    printf("%p\n", *(uint64 *)(fp - 8));
+    // fp - 16 是caller 的fp的地址
+    fp = *(uint64 *)(fp - 16);
+  }
 }
