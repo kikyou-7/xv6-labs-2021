@@ -5,6 +5,9 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
+
 
 /*
  * the kernel's page table.
@@ -56,6 +59,30 @@ kvminithart()
   sfence_vma();
 }
 
+
+// 会内部检查va是否是被进程申请过的
+int lazy_allocate(pagetable_t pagetable,uint64 va) 
+{
+  // 检查va是否是大于栈顶 小于sz
+  struct proc *p = myproc();
+  if ((va < p->trapframe->sp) || (va >= p->sz)) {
+    return -2;
+  } 
+  // 获得va所在页的起始位置, 用于对齐
+  va = PGROUNDDOWN(va);
+  char *pa = kalloc();
+  if (pa  == 0){
+    return -1;
+  }
+  memset(pa, 0, PGSIZE); 
+  // 更新页表
+  if(mappages(pagetable, va, PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+    kfree(pa);
+    return -2;
+  }
+  return 0;
+}
+
 // Return the address of the PTE in page table pagetable
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page-table pages.
@@ -73,7 +100,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 {
   if(va >= MAXVA)
     panic("walk");
-
+  // alloc是指 当找不到va对应的pa时(这里的pa是下一级页表), 创建一个
   for(int level = 2; level > 0; level--) {
     pte_t *pte = &pagetable[PX(level, va)];
     if(*pte & PTE_V) {
@@ -82,6 +109,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
       memset(pagetable, 0, PGSIZE);
+      // 创建了之后更新这个条目
       *pte = PA2PTE(pagetable) | PTE_V;
     }
   }
@@ -91,6 +119,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
+// 内核态 通过用户页表访问物理页
 uint64
 walkaddr(pagetable_t pagetable, uint64 va)
 {
@@ -101,10 +130,16 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
-  if((*pte & PTE_V) == 0)
-    return 0;
+  // 此时可能是懒分配导致缺页 我们交给lazy_allocate()处理
+  if(pte==0 || (*pte & PTE_V) == 0){
+    if (lazy_allocate(pagetable, va) == 0) {
+      pte = walk(pagetable, va, 0);
+    }
+    else {
+      return 0;
+    }
+  }
+    
   if((*pte & PTE_U) == 0)
     return 0;
   pa = PTE2PA(*pte);
@@ -180,10 +215,11 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     panic("uvmunmap: not aligned");
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
+    // 没有映射的就直接跳过 因为实现了懒分配
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      continue;
     if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+      continue;
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -314,10 +350,12 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
+    // 懒分配
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      continue;
+    // 懒分配
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      continue;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -344,7 +382,7 @@ uvmclear(pagetable_t pagetable, uint64 va)
   
   pte = walk(pagetable, va, 0);
   if(pte == 0)
-    panic("uvmclear");
+    return;
   *pte &= ~PTE_U;
 }
 
