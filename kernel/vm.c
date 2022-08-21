@@ -60,27 +60,35 @@ kvminithart()
 }
 
 
-// 会内部检查va是否是被进程申请过的
-int lazy_allocate(pagetable_t pagetable,uint64 va) 
-{
-  // 检查va是否是大于栈顶 小于sz
+// touch a lazy-allocated page so it's mapped to an actual physical page.
+void uvmlazytouch(uint64 va) {
   struct proc *p = myproc();
-  if ((va < p->trapframe->sp) || (va >= p->sz)) {
-    return -2;
-  } 
-  // 获得va所在页的起始位置, 用于对齐
-  va = PGROUNDDOWN(va);
-  char *pa = kalloc();
-  if (pa  == 0){
-    return -1;
+  char *mem = kalloc();
+  if(mem == 0) {
+    // failed to allocate physical memory
+    printf("lazy alloc: out of memory\n");
+    p->killed = 1;
+  } else {
+    memset(mem, 0, PGSIZE);
+    if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+      printf("lazy alloc: failed to map page\n");
+      kfree(mem);
+      // 此时也是内存不够用的情况
+      p->killed = 1;
+    }
   }
-  memset(pa, 0, PGSIZE); 
-  // 更新页表
-  if(mappages(pagetable, va, PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-    kfree(pa);
-    return -2;
-  }
-  return 0;
+  // printf("lazy alloc: %p, p->sz: %p\n", PGROUNDDOWN(va), p->sz);
+}
+
+// whether a page is previously lazy-allocated and needed to be touched before use.
+//需要分配内存的场景
+int uvmshouldtouch(uint64 va) {
+  pte_t *pte;
+  struct proc *p = myproc();
+  
+  return va < p->sz // within size of memory for the process
+    && va > p->trapframe->sp // not accessing stack guard page (it shouldn't be mapped)
+    && (((pte = walk(p->pagetable, va, 0))==0) || ((*pte & PTE_V)==0)); // page table entry does not exist
 }
 
 // Return the address of the PTE in page table pagetable
@@ -128,16 +136,13 @@ walkaddr(pagetable_t pagetable, uint64 va)
 
   if(va >= MAXVA)
     return 0;
-
+  // 懒分配
+  if (uvmshouldtouch(va)) {
+    uvmlazytouch(va);
+  }
   pte = walk(pagetable, va, 0);
-  // 此时可能是懒分配导致缺页 我们交给lazy_allocate()处理
   if(pte==0 || (*pte & PTE_V) == 0){
-    if (lazy_allocate(pagetable, va) == 0) {
-      pte = walk(pagetable, va, 0);
-    }
-    else {
-      return 0;
-    }
+    return 0;
   }
     
   if((*pte & PTE_U) == 0)
@@ -393,7 +398,8 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
-
+  // if(uvmshouldtouch(dstva))
+  //   uvmlazytouch(dstva);
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
@@ -418,7 +424,8 @@ int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
   uint64 n, va0, pa0;
-
+  // if(uvmshouldtouch(srcva))
+  //   uvmlazytouch(srcva);
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
