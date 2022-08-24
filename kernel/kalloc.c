@@ -134,9 +134,10 @@ void *kcopy_n_deref(void *pa) {
   memmove((void*)newpa, (void*)pa, PGSIZE);
 
   // 旧页的引用减 1
-  PA2PGREF(pa)--;
+  //PA2PGREF(pa)--;
 
   release(&pgreflock);
+  kfree(pa); // 引用次数-1
   return (void*)newpa;
 }
 
