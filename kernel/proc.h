@@ -1,6 +1,8 @@
 // Saved registers for kernel context switches.
 struct context {
-  uint64 ra;
+  // 对于调度器线程来说,ra存schuduler()中的某处地址, 实现从sched()跳到scheduler()
+  // 对于进程的内核线程来说, ra存的是上次退出CPU时的地方, 即:sched()中调用swtch()时的返回地址,proc.c line492
+  uint64 ra; 
   uint64 sp;
 
   // callee-saved

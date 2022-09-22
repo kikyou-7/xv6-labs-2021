@@ -134,7 +134,8 @@ found:
     release(&p->lock);
     return 0;
   }
-
+  // 进程第一次被创建时, 内核线程的初始化工作
+  // 将ra设置成forkret()的入口地址
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -487,6 +488,7 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
+  // 切换到CPU的调度器线程
   swtch(&p->context, &mycpu()->context);
   mycpu()->intena = intena;
 }
@@ -504,6 +506,8 @@ yield(void)
 
 // A fork child's very first scheduling by scheduler()
 // will swtch to forkret.
+// 线程被新创建后, 第一次被切换并运行时到达的地方
+// 释放掉锁, 然后调用usertrapret(), 让它好像就是从trap()里面返回一样
 void
 forkret(void)
 {
@@ -511,7 +515,7 @@ forkret(void)
 
   // Still holding p->lock from scheduler.
   release(&myproc()->lock);
-
+  // 如果进程是第一次被运行, 需要对文件系统做初始化工做
   if (first) {
     // File system initialization must be run in the context of a
     // regular process (e.g., because it calls sleep), and thus cannot
