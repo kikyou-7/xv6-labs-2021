@@ -263,6 +263,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
 // Recursively free page-table pages.
 // All leaf mappings must already have been removed.
+// 后续遍历释放多级页表
 void
 freewalk(pagetable_t pagetable)
 {
