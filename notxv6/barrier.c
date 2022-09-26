@@ -11,7 +11,7 @@ struct barrier {
   pthread_mutex_t barrier_mutex;
   pthread_cond_t barrier_cond;
   int nthread;      // Number of threads that have reached this round of the barrier
-  int round;     // Barrier round
+  int round;     // Barrier round, 卡住的次数
 } bstate;
 
 static void
@@ -30,7 +30,20 @@ barrier()
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
-  
+  // 阻塞线程, 直到所有的线程都运行停在这里
+  // 获取锁, 将++nthread, 判断条件语句, 陷入睡眠原子化
+  pthread_mutex_lock(&bstate.barrier_mutex); 
+  if (++bstate.nthread < nthread) {
+    pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+  }
+  // 最后一个线程也到这里了, 唤醒所有线程
+  else {
+    bstate.round++;
+    bstate.nthread = 0;
+    // 所有在等待这个条件的线程, 都被唤醒成RUNALBE的状态
+    pthread_cond_broadcast(&bstate.barrier_cond);
+  }
+  pthread_mutex_unlock(&bstate.barrier_mutex);
 }
 
 static void *
